@@ -1,0 +1,38 @@
+# Render blueprint. Connect the repo at https://dashboard.render.com/blueprints
+# and Render reads this file; no dashboard configuration is needed.
+services:
+  - type: web
+    name: url-audit-service
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      # Render terminates TLS at its load balancer, so the client IP arrives in
+      # X-Forwarded-For. Without this, every request would rate limit against
+      # the same proxy address.
+      - key: TRUST_PROXY
+        value: "true"
+      - key: CACHE_TTL_MS
+        value: "300000"
+      - key: RATE_LIMIT_MAX
+        value: "30"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      # The free instance is small, so keep outbound fan-out modest.
+      - key: MAX_CONCURRENT_AUDITS
+        value: "4"
+      - key: MAX_QUEUED_AUDITS
+        value: "16"
+      - key: FETCH_TIMEOUT_MS
+        value: "8000"
+      - key: AUDIT_TIMEOUT_MS
+        value: "12000"

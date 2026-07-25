@@ -1,0 +1,120 @@
+name: CI
+
+# Part (d): runs on every push to any branch, and on every pull request.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A newer push to the same ref supersedes an in-flight run.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck and test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The version deployed, plus the next LTS to catch breakage early.
+        node: ["22.x", "24.x"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # `npm ci` fails if package-lock.json is out of sync, which is what we
+      # want in CI: builds must be reproducible.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify the built server starts and serves traffic
+        run: |
+          # A green test suite still misses "the compiled output does not boot",
+          # so the built artefact is smoke tested against a real port.
+          node dist/index.js &
+          SERVER_PID=$!
+          trap "kill $SERVER_PID 2>/dev/null || true" EXIT
+
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/healthz > /dev/null; then
+              echo "Server is up after ${attempt} attempt(s)."
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "Server failed to start within 10s"
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          curl -fsS http://127.0.0.1:3000/readyz > /dev/null
+          echo "Smoke test passed."
+        env:
+          PORT: 3000
+          LOG_LEVEL: warn
+
+      - name: Upload coverage
+        if: matrix.node == '22.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  docker:
+    name: Build the container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t url-audit-service:${{ github.sha }} .
+
+      - name: Verify the image serves traffic
+        run: |
+          docker run -d --name audit -p 3000:3000 url-audit-service:${{ github.sha }}
+          trap "docker rm -f audit > /dev/null 2>&1 || true" EXIT
+
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/healthz > /dev/null; then break; fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "Container failed to become healthy"
+              docker logs audit
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # The guard against auditing internal addresses must be on by default
+          # in the shipped image, not just in the test configuration.
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/v1/audit \
+            -H 'content-type: application/json' \
+            -d '{"url":"http://169.254.169.254/latest/meta-data/"}')
+          if [ "$STATUS" != "403" ]; then
+            echo "Expected SSRF protection to return 403, got $STATUS"
+            exit 1
+          fi
+          echo "Container smoke test passed."
