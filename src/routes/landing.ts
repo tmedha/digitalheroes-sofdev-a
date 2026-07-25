@@ -60,6 +60,7 @@ export const LANDING_PAGE = `<!doctype html>
          background: color-mix(in srgb, var(--fg) 8%, transparent); padding: .1em .35em; border-radius: 4px; }
   .err { border-color: var(--fail); }
   footer { margin-top: 2.5rem; color: var(--muted); font-size: .85rem; }
+  .credit { margin: .9rem 0 0; padding-top: .9rem; border-top: 1px solid var(--line); }
   a { color: var(--accent); }
 </style>
 </head>
@@ -79,6 +80,7 @@ export const LANDING_PAGE = `<!doctype html>
     API: <code>POST /v1/audit</code> with <code>{"url": "https://example.com"}</code>,
     or <code>GET /v1/audit?url=…</code>. Health at <code>/healthz</code>, runtime stats at <code>/readyz</code>.
     Results are cached; add <code>refresh=true</code> to bypass.
+    <p class="credit"> <a href="https://digitalheroesco.com/" rel="noopener">Built for Digital Heroes Training Task</a></p>
   </footer>
 </main>
 <script>
