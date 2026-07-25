@@ -24,10 +24,12 @@ services:
       - key: LOG_LEVEL
         value: info
       # Render terminates TLS at its load balancer, so the client IP arrives in
-      # X-Forwarded-For. Without this, every request would rate limit against
-      # the same proxy address.
+      # X-Forwarded-For and every request would otherwise rate limit against the
+      # same proxy address. This is a hop count, not a boolean: Render puts
+      # exactly one proxy in front of the service, and trusting the whole chain
+      # would let a client spoof its own address and evade the rate limit.
       - key: TRUST_PROXY
-        value: "true"
+        value: "1"
       - key: CACHE_TTL_MS
         value: "300000"
       - key: RATE_LIMIT_MAX

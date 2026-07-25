@@ -23,14 +23,47 @@ const boolFromEnv = (defaultValue: boolean) =>
     })
     .pipe(z.boolean());
 
+/**
+ * How much of `X-Forwarded-For` to believe. Accepts a hop count, or a boolean.
+ *
+ * `true` means "trust the whole chain", which is a rate-limiting bypass: a
+ * client sends `X-Forwarded-For: 1.2.3.4`, the platform proxy appends the real
+ * address, and the leftmost entry the app then treats as the client is the
+ * attacker-controlled one. Rotating that header would buy an unlimited budget.
+ *
+ * A hop count is the safe form. Behind exactly one proxy (Render, Fly, a single
+ * nginx) use `1`: the address the trusted proxy actually observed is used, and
+ * anything the client prepended is ignored. Use `false` when the process is
+ * directly exposed, which is why that is the default.
+ */
+const trustProxyFromEnv = () =>
+  z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined || raw.trim() === "") return false;
+      const value = raw.trim().toLowerCase();
+      if (["true", "yes", "on"].includes(value)) return true;
+      if (["false", "no", "off"].includes(value)) return false;
+
+      const hops = Number(value);
+      if (Number.isInteger(hops) && hops >= 0 && hops <= 10) return hops;
+
+      ctx.addIssue({
+        code: "custom",
+        message: `must be a boolean or a hop count between 0 and 10, received ${JSON.stringify(raw)}`,
+      });
+      return z.NEVER;
+    });
+
 const configSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().default("0.0.0.0"),
   PORT: intFromEnv(3000, 1, 65535),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 
-  /** Trust `X-Forwarded-For` when running behind a platform load balancer. */
-  TRUST_PROXY: boolFromEnv(true),
+  /** Proxy hops to trust in `X-Forwarded-For`. See `trustProxyFromEnv`. */
+  TRUST_PROXY: trustProxyFromEnv(),
 
   /** How long a successful audit stays servable from cache. Part (b). */
   CACHE_TTL_MS: intFromEnv(5 * 60_000, 0, 24 * 60 * 60_000),

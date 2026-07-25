@@ -45,6 +45,23 @@ describe("loadConfig", () => {
     expect(() => loadConfig(env)).toThrow(/Invalid environment configuration/);
   });
 
+  it("defaults TRUST_PROXY to not trusting forwarded headers at all", () => {
+    // Safe by default: trusting X-Forwarded-For on a directly exposed process
+    // lets any client dictate the address the rate limiter keys on.
+    expect(loadConfig({}).TRUST_PROXY).toBe(false);
+  });
+
+  it("reads TRUST_PROXY as a hop count or a boolean", () => {
+    expect(loadConfig({ TRUST_PROXY: "1" }).TRUST_PROXY).toBe(1);
+    expect(loadConfig({ TRUST_PROXY: "0" }).TRUST_PROXY).toBe(0);
+    expect(loadConfig({ TRUST_PROXY: "true" }).TRUST_PROXY).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: "false" }).TRUST_PROXY).toBe(false);
+  });
+
+  it.each(["-1", "banana", "1.5", "99"])("rejects the TRUST_PROXY value %s", (value) => {
+    expect(() => loadConfig({ TRUST_PROXY: value })).toThrow(/Invalid environment configuration/);
+  });
+
   it("rejects a fetch timeout larger than the overall audit budget", () => {
     expect(() => loadConfig({ FETCH_TIMEOUT_MS: "20000", AUDIT_TIMEOUT_MS: "5000" })).toThrow(
       /must not exceed/,

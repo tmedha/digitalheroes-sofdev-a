@@ -4,7 +4,7 @@ An HTTP service that fetches a URL and reports on its security headers, SEO and 
 
 Built to run in production rather than to demo: input validation and SSRF protection, request timeouts at
 every layer, bounded concurrency with load shedding, a configurable cache window, per-client rate limiting,
-structured logs with request IDs, 179 tests, and CI that runs them on every push.
+structured logs with request IDs, 187 tests, and CI that runs them on every push.
 
 [![CI](https://github.com/tmedha/digitalheroes-sofdev-a/actions/workflows/ci.yml/badge.svg)](https://github.com/tmedha/digitalheroes-sofdev-a/actions/workflows/ci.yml)
 
@@ -313,25 +313,25 @@ deployment region rather than to any particular user.
 Everything is environment-driven, validated once at boot, and a bad value stops the process rather than
 surfacing later as strange behaviour. See [`.env.example`](.env.example).
 
-| Variable                  | Default                 | Purpose                                                                            |
-| ------------------------- | ----------------------- | ---------------------------------------------------------------------------------- |
-| `PORT`                    | `3000`                  | Listen port                                                                        |
-| `HOST`                    | `0.0.0.0`               | Bind address                                                                       |
-| `LOG_LEVEL`               | `info`                  | `fatal`…`trace`, or `silent`                                                       |
-| `TRUST_PROXY`             | `true`                  | Trust `X-Forwarded-For`. Required for correct rate limiting behind a load balancer |
-| `CACHE_TTL_MS`            | `300000`                | **Cache window.** `0` disables caching                                             |
-| `CACHE_MAX_ENTRIES`       | `500`                   | Cache size cap; LRU eviction beyond it                                             |
-| `FETCH_TIMEOUT_MS`        | `8000`                  | Budget for the outbound fetch, covering all redirects and the body read            |
-| `AUDIT_TIMEOUT_MS`        | `12000`                 | Budget for the whole audit. Must be >= `FETCH_TIMEOUT_MS`                          |
-| `MAX_REDIRECTS`           | `5`                     | Redirect hop limit                                                                 |
-| `MAX_BODY_BYTES`          | `2000000`               | Largest response body accepted                                                     |
-| `MAX_CONCURRENT_AUDITS`   | `8`                     | Outbound audits running at once                                                    |
-| `MAX_QUEUED_AUDITS`       | `32`                    | Requests allowed to wait for a slot before shedding load                           |
-| `QUEUE_TIMEOUT_MS`        | `5000`                  | How long a request may wait in that queue                                          |
-| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | Rate limit window                                                                  |
-| `RATE_LIMIT_MAX`          | `30`                    | Requests per window per client                                                     |
-| `USER_AGENT`              | `url-audit-service/1.0` | Sent on outbound requests                                                          |
-| `ALLOW_PRIVATE_ADDRESSES` | `false`                 | **Dangerous.** Permits auditing private addresses. Test fixtures only              |
+| Variable                  | Default                 | Purpose                                                                               |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
+| `PORT`                    | `3000`                  | Listen port                                                                           |
+| `HOST`                    | `0.0.0.0`               | Bind address                                                                          |
+| `LOG_LEVEL`               | `info`                  | `fatal`…`trace`, or `silent`                                                          |
+| `TRUST_PROXY`             | `false`                 | Proxy hops to trust in `X-Forwarded-For`. Use `1` behind one load balancer. See below |
+| `CACHE_TTL_MS`            | `300000`                | **Cache window.** `0` disables caching                                                |
+| `CACHE_MAX_ENTRIES`       | `500`                   | Cache size cap; LRU eviction beyond it                                                |
+| `FETCH_TIMEOUT_MS`        | `8000`                  | Budget for the outbound fetch, covering all redirects and the body read               |
+| `AUDIT_TIMEOUT_MS`        | `12000`                 | Budget for the whole audit. Must be >= `FETCH_TIMEOUT_MS`                             |
+| `MAX_REDIRECTS`           | `5`                     | Redirect hop limit                                                                    |
+| `MAX_BODY_BYTES`          | `2000000`               | Largest response body accepted                                                        |
+| `MAX_CONCURRENT_AUDITS`   | `8`                     | Outbound audits running at once                                                       |
+| `MAX_QUEUED_AUDITS`       | `32`                    | Requests allowed to wait for a slot before shedding load                              |
+| `QUEUE_TIMEOUT_MS`        | `5000`                  | How long a request may wait in that queue                                             |
+| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | Rate limit window                                                                     |
+| `RATE_LIMIT_MAX`          | `30`                    | Requests per window per client                                                        |
+| `USER_AGENT`              | `url-audit-service/1.0` | Sent on outbound requests                                                             |
+| `ALLOW_PRIVATE_ADDRESSES` | `false`                 | **Dangerous.** Permits auditing private addresses. Test fixtures only                 |
 
 ---
 
@@ -362,6 +362,14 @@ in an `onRequest` hook — before validation and before any outbound work — so
 almost nothing to reject. The window is a sliding counter, which avoids the fixed-window flaw where a client
 spends a full quota just before a boundary and another immediately after, achieving twice the intended rate.
 Health probes are exempt so a platform's checks can never be throttled.
+
+Behind a proxy, `TRUST_PROXY` must be a **hop count**, not `true`. Trusting the whole `X-Forwarded-For`
+chain is a rate-limit bypass: the client sends its own `X-Forwarded-For`, the platform proxy appends the
+address it observed, and the leftmost entry — the one the app would treat as the client — is attacker
+controlled, so rotating that header buys an unlimited budget. This was caught by probing the live
+deployment, not in review. With a hop count the address the trusted proxy actually observed is used and
+anything the client prepended is ignored: `1` for Render, Fly, Railway or a single nginx, and the default
+`false` when the process is directly exposed.
 
 **Logging.** One JSON object per line via pino, at `info`: `audit.start`, `audit.complete`,
 `audit.cache_hit`, `rate_limit.exceeded`, `request.complete`, plus lifecycle events. Every line carries
@@ -404,7 +412,7 @@ npm test
 npm run test:coverage
 ```
 
-179 tests. The integration tests run the real application — real routes, hooks, error handling and network
+187 tests. The integration tests run the real application — real routes, hooks, error handling and network
 path — against a fixture origin server on loopback. `fetch` is not mocked, so timeouts, redirect chains,
 chunked bodies and size limits are exercised for real.
 

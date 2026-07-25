@@ -97,6 +97,47 @@ describe("rate limiting", () => {
     });
   });
 
+  it("cannot be evaded by spoofing X-Forwarded-For when the process is directly exposed", async () => {
+    // Found against the live deployment: with TRUST_PROXY=true the whole
+    // forwarded chain is believed, so a client that sends its own
+    // X-Forwarded-For and rotates it gets a fresh budget every request.
+    await withApp({ RATE_LIMIT_MAX: "1", TRUST_PROXY: "false" }, async (harness) => {
+      const send = (ip: string) =>
+        harness.app.inject({
+          method: "POST",
+          url: "/v1/audit",
+          headers: { "x-forwarded-for": ip },
+          payload: { url: origin.url("/good") },
+        });
+
+      expect((await send("5.5.5.5")).statusCode).toBe(200);
+      // A different spoofed address must not buy a new allowance: both requests
+      // came from the same real peer.
+      expect((await send("6.6.6.6")).statusCode).toBe(429);
+      expect((await send("7.7.7.7")).statusCode).toBe(429);
+    });
+  });
+
+  it("uses the address the trusted proxy observed, not one the client prepended", async () => {
+    // One proxy hop, as on Render. The chain is "<spoofed>, <real client>";
+    // only the rightmost entry was actually observed by the trusted proxy.
+    await withApp({ RATE_LIMIT_MAX: "1", TRUST_PROXY: "1" }, async (harness) => {
+      const send = (chain: string) =>
+        harness.app.inject({
+          method: "POST",
+          url: "/v1/audit",
+          headers: { "x-forwarded-for": chain },
+          payload: { url: origin.url("/good") },
+        });
+
+      expect((await send("1.1.1.1, 203.0.113.10")).statusCode).toBe(200);
+      // Same real client, different spoofed prefix: still the same bucket.
+      expect((await send("2.2.2.2, 203.0.113.10")).statusCode).toBe(429);
+      // A genuinely different client, as reported by the trusted proxy.
+      expect((await send("3.3.3.3, 203.0.113.99")).statusCode).toBe(200);
+    });
+  });
+
   it("rejects over-limit requests without touching the origin", async () => {
     await withApp({ RATE_LIMIT_MAX: "1", CACHE_TTL_MS: "0" }, async (harness) => {
       const path = "/bare";
