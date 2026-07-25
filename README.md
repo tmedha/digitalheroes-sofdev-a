@@ -6,10 +6,10 @@ Built to run in production rather than to demo: input validation and SSRF protec
 every layer, bounded concurrency with load shedding, a configurable cache window, per-client rate limiting,
 structured logs with request IDs, 179 tests, and CI that runs them on every push.
 
-[![CI](https://github.com/tmedha/url-audit-service/actions/workflows/ci.yml/badge.svg)](https://github.com/tmedha/url-audit-service/actions/workflows/ci.yml)
+[![CI](https://github.com/tmedha/digitalheroes-sofdev-a/actions/workflows/ci.yml/badge.svg)](https://github.com/tmedha/digitalheroes-sofdev-a/actions/workflows/ci.yml)
 
 **Live:** _pending — see [Deploying](#deploying)_
-**Source:** <https://github.com/tmedha/url-audit-service>
+**Source:** <https://github.com/tmedha/digitalheroes-sofdev-a>
 
 ---
 

@@ -7,11 +7,18 @@ services:
     plan: free
     region: oregon
     branch: main
-    buildCommand: npm ci && npm run build
+    # NODE_ENV=production is set below for the runtime, and npm honours it at
+    # install time too by skipping devDependencies. TypeScript is a
+    # devDependency, so without --include=dev the build fails with
+    # "tsc: not found". Only dist/ and production deps are needed to run.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      # Pinned so the build does not drift onto a new default Node major.
+      - key: NODE_VERSION
+        value: "22"
       - key: NODE_ENV
         value: production
       - key: LOG_LEVEL
