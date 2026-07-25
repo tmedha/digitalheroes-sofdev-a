@@ -173,6 +173,10 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       maxConcurrentAudits: config.MAX_CONCURRENT_AUDITS,
       rateLimitMax: config.RATE_LIMIT_MAX,
       rateLimitWindowMs: config.RATE_LIMIT_WINDOW_MS,
+      // Exposed because getting this wrong silently breaks per-client rate
+      // limiting, and the failure is invisible from outside: `true` behind a
+      // proxy lets a client pick its own identity via X-Forwarded-For.
+      trustProxy: config.TRUST_PROXY,
     },
   }));
 
