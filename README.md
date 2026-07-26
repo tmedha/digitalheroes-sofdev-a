@@ -494,19 +494,7 @@ site can be strong on SEO and weak on security.
 
 ## On the use of AI
 
-AI was used deliberately on this project in two roles: broadening the test suite, and pressure-testing my
-understanding of the concepts underneath it. Enumerating edge cases is exactly the work where an assistant
-earns its keep — cataloguing the ways a hostile origin can misbehave (redirect loops, a redirect carrying no
-`Location`, a body that streams past its declared length, a connection held open until the budget expires)
-and turning each into a fixture and an assertion is mechanical once the shape is clear, and it is the first
-thing to get cut by hand under time pressure. That breadth paid for itself twice, both times by catching
-something review would not have: the suite surfaced a word-count bug that only manifests on minified HTML,
-where adjacent tags with no whitespace between them were being glued into a single word; and probing the
-deployed service turned up a rate-limit bypass, where trusting the entire `X-Forwarded-For` chain let a
-client prepend its own address and rotate it for an unlimited budget. The second role was closer to a tutor
-than an author — interrogating _why_ a sliding-window counter beats a fixed window at the boundary, why
-redirects must be followed manually so every hop is re-checked against the SSRF guard rather than trusting
-`redirect: "follow"`, and why a cache needs single-flight protection or a burst of traffic for one cold URL
-arrives at the target site all at once. I set the scope, made the calls on what the service should and
-should not do, and verified every claim against the running deployment rather than taking it on trust; AI
-made it feasible to cover the edges properly and to understand each decision well enough to defend it.
+AI was used on this project in two roles: creating the test suite and learning the concepts behind URL auditing. Claude helped figure out edge-cases that could otherwise be forgotten by me. It also helped by cataloguing the ways a hostile origin can misbehave (redirect loops, a redirect carrying no Location, a body that streams past its declared length, a connection held open until the budget expires) and turning each into a fixture. It also helped me catch bugs in the code, twice catching something my review kept missing. The suite surfaced a word-count bug that only manifests on minified HTML, and probing the deployed service turned up a rate-limit bypass, and I caught these bugs with the help of AI, without having to spend hours on it. I also used AI as a tutor. I inquired why a sliding-window counter beats a fixed window at the boundary, why redirects must be followed manually so every hop is re-checked against the SSRF guard, and other questions like that to learn as I do. I also used AI to write the .yml file to host the project on a live url.
+AI made it feasible to cover the edges properly and to understand each decision and task well.
+<img width="468" height="249" alt="image" src="https://github.com/user-attachments/assets/2ba95c1a-b289-41b8-8e00-7799929868fb" />
+
