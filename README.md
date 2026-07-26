@@ -2,7 +2,7 @@
 
 An HTTP service that fetches a URL and reports on its security headers, SEO and page metadata.
 
-Built to run in production rather than to demo: input validation and SSRF protection, request timeouts at
+Input validation and SSRF protection, request timeouts at
 every layer, bounded concurrency with load shedding, a configurable cache window, per-client rate limiting,
 structured logs with request IDs, 187 tests, and CI that runs them on every push.
 
